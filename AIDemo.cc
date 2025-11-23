@@ -53,9 +53,9 @@ struct PLAYER_NAME : public Player {
     if (round()% 2 == 0) {
       // Move all soldiers randomly (avoiding out of bounds and walls)
       for (int id : s) {
-      Dir d = dirs[random(0,dirs.size()-1)];
-      Pos new_pos = unit(id).pos + d;
-      if (pos_ok(new_pos) and cell(new_pos.i,new_pos.j).type != Wall) move(id,d);
+        Dir d = dirs[random(0,dirs.size()-1)];
+        Pos new_pos = unit(id).pos + d;
+        if (pos_ok(new_pos) and cell(new_pos.i,new_pos.j).type != Wall) move(id,d);
       }
     }
     else {
@@ -84,9 +84,9 @@ struct PLAYER_NAME : public Player {
     int id_box = -1;
     for (int i = 0; i < board_rows(); ++i)
       for (int j = 0; j < board_cols(); ++j)
-        if (cell(i,j).box != -1) {
-          id_box = cell(i,j).box;
-        }
+	      if (cell(i,j).box != -1) {
+	        id_box = cell(i,j).box;
+	      }
     
     vector<int> hints = safety_box_hints(id_box);
     vector<int> sol = vector<int>(hints.size(),1); // obviously not a good solution
