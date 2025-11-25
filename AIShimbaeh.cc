@@ -51,86 +51,108 @@ struct PLAYER_NAME : public Player {
   const vector<int> dir_x = {1, 0, -1, 0};
   const vector<int> dir_y = {0, 1, 0, -1};
 
+  //posicion a seguir para llegar a soldados o profesores enemigos
   Pos BFS_kill_soldiers_or_professors(Pos& p, int n, int m) {
     vector<vector<int>> dist(n, vector<int>(m, -1));
-    queue<Pos> q;
-    q.push(p);
+    queue<pair<Pos,Pos>> q;
+    Pos next_step_pos;
+
+    q.push({p, p});
     dist[p.i][p.j] = 0;
+
     while (!q.empty()) {
-      int x = q.front().i;
-      int y = q.front().j;
+      int x = q.front().first.i;
+      int y = q.front().first.j;
+      Pos step_pos = q.front().second;
       q.pop();
-      Cell c = cell(x,y);
-      if (c.id != -1) {
-        Unit u = unit(c.id);
-        if (u.player != me()) return Pos(x,y);
-      }
+
       for (int i = 0; i<4; i++) {
         int nx = x + dir_x[i];
         int ny = y + dir_y[i];
         Cell nc = cell(nx,ny);
         if (pos_ok(Pos(nx, ny)) && nc.type != Wall && dist[nx][ny] == -1) {
+          if (p == step_pos) next_step_pos = Pos(nx, ny);
+          else next_step_pos = step_pos;
+
+          if (nc.id != -1) {
+            Unit u = unit(nc.id);
+            if (u.player != me()) return next_step_pos;
+          }
+
           dist[nx][ny] = dist[x][y] + 1;
-          q.push(Pos(nx,ny));
+          q.push({Pos(nx,ny), next_step_pos});
         }
       }
     }
-    return Pos(-1,-1);
+    return p;
   }
 
+  //posicion a seguir para llegar a kits o dinero
   Pos BFS_take_kits_or_money(Pos& p, int n, int m) {
     vector<vector<int>> dist(n, vector<int>(m, -1));
-    queue<Pos> q;
-    q.push(p);
+    queue<pair<Pos,Pos>> q;
+    Pos next_step_pos;
+
+    q.push({p, p});//{"posicion a mirar", "paso a seguir desde la posicion inicial"}
     dist[p.i][p.j] = 0;
+
     while (!q.empty()) {
-      int x = q.front().i;
-      int y = q.front().j;
+      int x = q.front().first.i;
+      int y = q.front().first.j;
+      Pos step_pos = q.front().second;
       q.pop();
-      Cell c = cell(x,y);
-      if (c.health_kit || c.poison_kit || c.money>0) return Pos(x,y);
-      for (int i = 0; i<4; i++) {
+
+      for (int i = 0; i<4; i++) {//mirar todas las direcciones
         int nx = x + dir_x[i];
         int ny = y + dir_y[i];
+
         Cell nc = cell(nx,ny);
-        if (pos_ok(Pos(nx, ny)) && nc.type != Wall && dist[nx][ny] == -1) {
-          dist[nx][ny] = dist[x][y] + 1;
-          q.push(Pos(nx,ny));
+        if (pos_ok(Pos(nx, ny)) && nc.type != Wall && dist[nx][ny] == -1) {//comprovar que no es una pos invalida
+          if (p == step_pos) next_step_pos = Pos(nx, ny);//propagar el paso a seguir para llegar al objetivo
+          else next_step_pos = step_pos;
+
+          if (nc.health_kit || nc.poison_kit || nc.money>0) return next_step_pos;//si se ha llegado al objetivo, devolver la pos a seguir
+
+          dist[nx][ny] = dist[x][y] + 1;//aumentar la distancia
+          q.push({Pos(nx,ny), next_step_pos});//añadir la nueva posicion visitada a la cola con el paso incial a seguir
         }
       }
     }
-    return Pos(-1,-1);
+    return p;//devolver la inicial si no encuentra el objetivo, imposible que pase
   }
 
+  //posicion a seguir para llegar a una caja
   Pos BFS_safety_box(Pos& p, int n, int m) {
     vector<vector<int>> dist(n, vector<int>(m, -1));
-    queue<Pos> q;
-    q.push(p);
+    queue<pair<Pos, Pos>> q;
+    Pos next_step_pos;
+
+    q.push({p, p});
     dist[p.i][p.j] = 0;
+
     while (!q.empty()) {
-      int x = q.front().i;
-      int y = q.front().j;
+      int x = q.front().first.i;
+      int y = q.front().first.j;
+      Pos step_pos = q.front().second;
       q.pop();
-      Cell c = cell(x,y);
-      if (c.box != -1) return Pos(x,y);
+
       for (int i = 0; i<4; i++) {
         int nx = x + dir_x[i];
         int ny = y + dir_y[i];
+
         Cell nc = cell(nx,ny);
         if (pos_ok(Pos(nx, ny)) && nc.type != Wall && dist[nx][ny] == -1) {
+          if (p == step_pos) next_step_pos = Pos(nx, ny);
+          else next_step_pos = step_pos;
+
+          if (nc.box != -1) return next_step_pos;
+
           dist[nx][ny] = dist[x][y] + 1;
-          q.push(Pos(nx,ny));
+          q.push({Pos(nx,ny), next_step_pos});
         }
       }
     }
-    // for (int i = 0; i<n; i++) {
-    //   for (int j = 0; j<m; j++) {
-    //     cerr << dist[i][j] << " ";
-    //   }
-    //   cerr << endl;
-    // }
-    // cerr << endl;
-    return Pos(-1,-1);
+    return p;
   }
   
   /**
@@ -143,31 +165,16 @@ struct PLAYER_NAME : public Player {
     int n = board_rows();
     int m = board_cols();
 
-    //MAPA PARA PONER LAS DISTANCAS HASTA EL TESORO MAS CERCANO, PARA PODER SEGUIR LAS DIRECCIONES
-    //IRSE MOVIENDO DE UN NUMERO MAS ALTO (MAS LEJOS DEL TESORO) HASTA EL MAS PEQUEÑO (MAS CERCA DEL TESORO)
-    //0   1   2
-    //1   -1  3
-    //0 -> TIENE EL TESORO, -1 -> ES UN MURO, LOS DEMAS LA DISTANCIA HASTA EL TESORO
-    vector<vector<char>> map (n, vector<char>(m));
-    for (int i = 0; i < n; i++) {
-      for (int j = 0; j < m; j++) {
-        Cell c = cell(i, j);
-        if (c.type == Wall) map[i][j] = '-1';
-        else if (c.health_kit || c.poison_kit || c.money>0) map[i][j] = '0';
-        else if (c.box!=-1) map[i][j] = '0';
-      }
-    }
-
     vector<int> s = soldiers(me());
     for (int i = 0; i < int(s.size()); i++) {
       Unit u = unit(s[i]);
-      if (available_poison(me()) > 2 && u.poison < 2) charge(s[i]); //recarga veneno si tiene menos de 2
+      if (available_poison(me()) > 0 && u.poison < 2) charge(s[i]); //recarga veneno si tiene menos de 2
       
-      if (random(0,9)<7) {//70% van a matar
-        Pos pos_to_kill = BFS_kill_soldiers_or_professors(u.pos, n, m);
+      if (u.poison > 0) {//que vayan a matar solo si tienen veneno
+        Pos pos_to_kill = BFS_kill_soldiers_or_professors(u.pos, n, m);//mejorarlo y que se prioricen profresores(?)
         if (pos_to_kill != Pos(-1, -1)) move(u.id, go_to(u.pos, pos_to_kill));
         else move(u.id, Down);
-      } else {//30% van a recoger kits y oro
+      } else {//los demas van a recoger kits y oro
         Pos pos_to_loot = BFS_take_kits_or_money(u.pos, n, m);
         if (pos_to_loot != Pos(-1,-1)) move(u.id, go_to(u.pos, pos_to_loot));
         else move(u.id, Down);
@@ -177,11 +184,14 @@ struct PLAYER_NAME : public Player {
     Unit p = unit(professor(me())); //mi profresor
     if (available_health(me()) > 0 && p.health < 30) heal(p.id); //se cura si tiene menos de 30 de vida
     //ir en direccion a una caja fuerte
-    Pos pos_to_box = BFS_safety_box(p.pos, n, m);
-    if (pos_to_box != Pos(-1, -1)) move(p.id, go_to(p.pos, pos_to_box));
-    else move(p.id, Down);
+    if (cell(p.pos).box != -1) {//si esta en la puerta, abrirla
+      
+    } else {//si no esta en la puerta, ir hacia una
+      Pos pos_to_box = BFS_safety_box(p.pos, n, m);
+      if (pos_to_box != Pos(-1, -1)) move(p.id, go_to(p.pos, pos_to_box));
+      else move(p.id, Down);
+    }
   }
-
 };
 
 
