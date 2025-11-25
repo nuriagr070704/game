@@ -154,6 +154,63 @@ struct PLAYER_NAME : public Player {
     }
     return p;
   }
+
+  Pos directon_to_box_door(Pos& p) {
+    for (int i = 0; i < 4; i++) {
+      int nx = p.i + dir_x[i];
+      int ny = p.j + dir_y[i];
+      if (pos_ok(nx, ny) && cell(nx, ny).box != -1) return Pos(nx, ny);
+    }
+    return p;
+  }
+
+  bool backtrack(int triplet, vector<int>& hint, vector<int>& pass, int n) {
+    if (triplet == n) return true;
+
+    for (int i = 0; i < 3*n ; i++) {
+      if (pass[i] != -1) continue;//cojer solo posiciones no visitadas
+      for (int j = i+1; j < 3*n; j++) {
+        if (pass[j] != -1) continue;//cojer solo posiciones no visitadas
+        for (int k = j+1; k < 3*n; k++) {
+          if (pass[k] != -1) continue;//cojer solo posiciones no visitadas
+
+          int a = hint[i];
+          int b = hint[j];
+          int c = hint[k];
+
+          //si no cumplen, mirar otras combinaciones
+          if (a+b!=c && a+c!=b && b+c!=a) continue;
+
+          //asignar la solucion encontrada
+          pass[i] = triplet;
+          pass[j] = triplet;
+          pass[k] = triplet;
+
+          //si en las siguientes tuplas se encuentran todas las combinaciones,
+          //es que hemos encontrado la contraseña
+          if (backtrack(triplet+1, hint, pass, n)) return true;
+
+          //si devuelve false es que no hemos encontrado una de las combinaciones que faltan,
+          //tenemos que desbloquear las posiciones porque no son una solucion posible
+          pass[i] = -1;
+          pass[j] = -1;
+          pass[k] = -1;
+        }
+      }
+    }
+    //no se ha encontrado una posible solucion
+    return false;
+  }
+
+  vector<int> BF_box_password(int box_id) {
+    vector<int> hint = safety_box_hints(box_id);
+    vector<int> pass (hint.size(), -1);
+    int n = hint.size() / 3;
+    
+    backtrack(0, hint, pass, n);
+    
+    return pass;
+  }
   
   /**
    * Play method, invoked once per each round.
@@ -184,8 +241,21 @@ struct PLAYER_NAME : public Player {
     Unit p = unit(professor(me())); //mi profresor
     if (available_health(me()) > 0 && p.health < 30) heal(p.id); //se cura si tiene menos de 30 de vida
     //ir en direccion a una caja fuerte
-    if (cell(p.pos).box != -1) {//si esta en la puerta, abrirla
-      
+    Pos box_pos = directon_to_box_door(p.pos);
+    if (box_pos != p.pos) {//si esta en la puerta, abrirla
+      cerr << "el profesor del equipo " << p.player << " esta parado en la posicion " << p.pos << endl;
+      cerr << "la posicion a seguir es " << box_pos << endl;
+      //conseguir solución
+      vector<int> sol = BF_box_password(cell(box_pos).box);
+      //debug
+      auto hint = safety_box_hints(cell(box_pos).box);
+      cerr << "la pista es ";
+      for (int v : hint) cerr << v << " ";
+      cerr << endl << "la solucion es ";
+      for (int v : sol) cerr << v << " ";
+      cerr << endl;
+      //debug
+      open(p.id, sol, go_to(p.pos, box_pos));//abrir caja
     } else {//si no esta en la puerta, ir hacia una
       Pos pos_to_box = BFS_safety_box(p.pos, n, m);
       if (pos_to_box != Pos(-1, -1)) move(p.id, go_to(p.pos, pos_to_box));
