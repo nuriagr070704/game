@@ -22,8 +22,6 @@ struct PLAYER_NAME : public Player {
    * Types and attributes for your player can be defined here.
    */
 
-  //HACER UNO ESPECIFICO PARA SOLDADOS Y OTRO PARA PROFESORES
-  //CUANDO SE CRUCAN CON ALGUIEN DE SU EQUIPO O NO TIENEN VENENO PARA MATAR NO SE MUEVEN
   //Direccion para ir de `a` a `b`
   Dir go_to(Pos a, Pos b) {
     vector<Dir> dirs;
@@ -85,6 +83,39 @@ struct PLAYER_NAME : public Player {
       }
     }
     return p;
+  }
+
+  Pos BFS_take_poison_money(Pos& p, int n, int m) {
+    vector<vector<int>> dist(n, vector<int>(m, -1));
+    queue<pair<Pos,Pos>> q;
+    Pos next_step_pos;
+
+    q.push({p, p});//{"posicion a mirar", "paso a seguir desde la posicion inicial"}
+    dist[p.i][p.j] = 0;
+
+    while (!q.empty()) {
+      int x = q.front().first.i;
+      int y = q.front().first.j;
+      Pos step_pos = q.front().second;
+      q.pop();
+
+      for (int i = 0; i<4; i++) {//mirar todas las direcciones
+        int nx = x + dir_x[i];
+        int ny = y + dir_y[i];
+
+        Cell nc = cell(nx,ny);
+        if (pos_ok(Pos(nx, ny)) && nc.type != Wall && dist[nx][ny] == -1) {//comprovar que no es una pos invalida
+          if (p == step_pos) next_step_pos = Pos(nx, ny);//propagar el paso a seguir para llegar al objetivo
+          else next_step_pos = step_pos;
+
+          if (nc.poison_kit || nc.money != 0) return next_step_pos;//si se ha llegado al objetivo, devolver la pos a seguir
+
+          dist[nx][ny] = dist[x][y] + 1;//aumentar la distancia
+          q.push({Pos(nx,ny), next_step_pos});//añadir la nueva posicion visitada a la cola con el paso incial a seguir
+        }
+      }
+    }
+    return p;//devolver la inicial si no encuentra el objetivo, imposible que pase
   }
 
   //posicion a seguir para llegar a kits o dinero
@@ -202,7 +233,7 @@ struct PLAYER_NAME : public Player {
     return false;
   }
 
-  vector<int> BF_box_password(int box_id) {
+  vector<int> BF_box_password(int box_id) {//PUEDE PASAR QUE SIGA A OTRO PROFRESOR QUE LE VA DELANTE Y NUNCA COJA NINGUNA CAJA
     vector<int> hint = safety_box_hints(box_id);
     vector<int> pass (hint.size(), -1);
     int n = hint.size() / 3;
@@ -227,34 +258,25 @@ struct PLAYER_NAME : public Player {
       Unit u = unit(s[i]);
       if (available_poison(me()) > 0 && u.poison < 2) charge(s[i]); //recarga veneno si tiene menos de 2
       
+      //hacer que huya si tiene un enemigo cerca y no tiene veneno*******************************************************************
       if (u.poison > 0) {//que vayan a matar solo si tienen veneno
         Pos pos_to_kill = BFS_kill_soldiers_or_professors(u.pos, n, m);//mejorarlo y que se prioricen profresores(?)
         if (pos_to_kill != Pos(-1, -1)) move(u.id, go_to(u.pos, pos_to_kill));
         else move(u.id, Down);
       } else {//los demas van a recoger kits y oro
         Pos pos_to_loot = BFS_take_kits_or_money(u.pos, n, m);
+        //Pos pos_to_loot = BFS_take_poison_money(u.pos, n, m);
         if (pos_to_loot != Pos(-1,-1)) move(u.id, go_to(u.pos, pos_to_loot));
         else move(u.id, Down);
       }
     }
 
     Unit p = unit(professor(me())); //mi profresor
-    if (available_health(me()) > 0 && p.health < 30) heal(p.id); //se cura si tiene menos de 30 de vida
+    if (available_health(me()) > 0 && p.health < professor_max_health()) heal(p.id); //se cura si tiene menos del tope de vida
     //ir en direccion a una caja fuerte
     Pos box_pos = directon_to_box_door(p.pos);
     if (box_pos != p.pos) {//si esta en la puerta, abrirla
-      cerr << "el profesor del equipo " << p.player << " esta parado en la posicion " << p.pos << endl;
-      cerr << "la posicion a seguir es " << box_pos << endl;
-      //conseguir solución
-      vector<int> sol = BF_box_password(cell(box_pos).box);
-      //debug
-      auto hint = safety_box_hints(cell(box_pos).box);
-      cerr << "la pista es ";
-      for (int v : hint) cerr << v << " ";
-      cerr << endl << "la solucion es ";
-      for (int v : sol) cerr << v << " ";
-      cerr << endl;
-      //debug
+      vector<int> sol = BF_box_password(cell(box_pos).box);//conseguir solución
       open(p.id, sol, go_to(p.pos, box_pos));//abrir caja
     } else {//si no esta en la puerta, ir hacia una
       Pos pos_to_box = BFS_safety_box(p.pos, n, m);
