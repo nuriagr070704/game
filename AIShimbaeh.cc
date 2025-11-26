@@ -76,7 +76,7 @@ struct PLAYER_NAME : public Player {
 
             if (nc.id != -1) {
               Unit u = unit(nc.id);
-              if (u.player != me()) return next_step_pos;
+              if (u.player != me() && u.poison == 0) return next_step_pos;
             }
 
             dist[nx][ny] = dist[x][y] + 1;
@@ -269,10 +269,15 @@ struct PLAYER_NAME : public Player {
         charge(s[i]); //recarga veneno si tiene menos de 2
       } else {
         //hacer que huya si tiene un enemigo cerca y no tiene veneno*******************************************************************
+        //puede ir a una caja fuerte el muñeco jajajjajajjajja
         if (u.poison > 0) {//que vayan a matar solo si tienen veneno
           Pos pos_to_kill = BFS_kill_soldiers_or_professors(u.pos, n, m);//mejorarlo y que se prioricen profresores(?)
           if (pos_to_kill != Pos(-1, -1)) move(u.id, go_to(u.pos, pos_to_kill));
-          else move(u.id, Down);
+          else {
+            Pos pos_to_loot = BFS_take_kits_or_money(u.pos, n, m);
+            if (pos_to_loot != Pos(-1,-1)) move(u.id, go_to(u.pos, pos_to_loot));
+            else move(u.id, Down);
+          }
         } else {//los demas van a recoger kits y oro
           Pos pos_to_loot = BFS_take_kits_or_money(u.pos, n, m);
           //Pos pos_to_loot = BFS_take_poison_money(u.pos, n, m);
