@@ -67,18 +67,21 @@ struct PLAYER_NAME : public Player {
       for (int i = 0; i<4; i++) {
         int nx = x + dir_x[i];
         int ny = y + dir_y[i];
-        Cell nc = cell(nx,ny);
-        if (pos_ok(Pos(nx, ny)) && nc.type != Wall && dist[nx][ny] == -1) {
-          if (p == step_pos) next_step_pos = Pos(nx, ny);
-          else next_step_pos = step_pos;
 
-          if (nc.id != -1) {
-            Unit u = unit(nc.id);
-            if (u.player != me()) return next_step_pos;
+        if (pos_ok(nx, ny)) {
+          Cell nc = cell(nx,ny);
+          if (nc.type != Wall && dist[nx][ny] == -1) {
+            if (p == step_pos) next_step_pos = Pos(nx, ny);
+            else next_step_pos = step_pos;
+
+            if (nc.id != -1) {
+              Unit u = unit(nc.id);
+              if (u.player != me()) return next_step_pos;
+            }
+
+            dist[nx][ny] = dist[x][y] + 1;
+            q.push({Pos(nx,ny), next_step_pos});
           }
-
-          dist[nx][ny] = dist[x][y] + 1;
-          q.push({Pos(nx,ny), next_step_pos});
         }
       }
     }
@@ -103,15 +106,17 @@ struct PLAYER_NAME : public Player {
         int nx = x + dir_x[i];
         int ny = y + dir_y[i];
 
-        Cell nc = cell(nx,ny);
-        if (pos_ok(Pos(nx, ny)) && nc.type != Wall && dist[nx][ny] == -1) {//comprovar que no es una pos invalida
-          if (p == step_pos) next_step_pos = Pos(nx, ny);//propagar el paso a seguir para llegar al objetivo
-          else next_step_pos = step_pos;
+        if (pos_ok(nx, ny)) {
+          Cell nc = cell(nx,ny);
+          if (nc.type != Wall && dist[nx][ny] == -1) {//comprovar que no es una pos invalida
+            if (p == step_pos) next_step_pos = Pos(nx, ny);//propagar el paso a seguir para llegar al objetivo
+            else next_step_pos = step_pos;
 
-          if (nc.poison_kit || nc.money != 0) return next_step_pos;//si se ha llegado al objetivo, devolver la pos a seguir
+            if (nc.poison_kit || nc.money != 0) return next_step_pos;//si se ha llegado al objetivo, devolver la pos a seguir
 
-          dist[nx][ny] = dist[x][y] + 1;//aumentar la distancia
-          q.push({Pos(nx,ny), next_step_pos});//añadir la nueva posicion visitada a la cola con el paso incial a seguir
+            dist[nx][ny] = dist[x][y] + 1;//aumentar la distancia
+            q.push({Pos(nx,ny), next_step_pos});//añadir la nueva posicion visitada a la cola con el paso incial a seguir
+          }
         }
       }
     }
@@ -137,15 +142,17 @@ struct PLAYER_NAME : public Player {
         int nx = x + dir_x[i];
         int ny = y + dir_y[i];
 
-        Cell nc = cell(nx,ny);
-        if (pos_ok(Pos(nx, ny)) && nc.type != Wall && dist[nx][ny] == -1) {//comprovar que no es una pos invalida
-          if (p == step_pos) next_step_pos = Pos(nx, ny);//propagar el paso a seguir para llegar al objetivo
-          else next_step_pos = step_pos;
+        if (pos_ok(nx, ny)) {
+          Cell nc = cell(nx,ny);
+          if (nc.type != Wall && dist[nx][ny] == -1) {//comprovar que no es una pos invalida
+            if (p == step_pos) next_step_pos = Pos(nx, ny);//propagar el paso a seguir para llegar al objetivo
+            else next_step_pos = step_pos;
 
-          if (nc.health_kit || nc.poison_kit || nc.money>0) return next_step_pos;//si se ha llegado al objetivo, devolver la pos a seguir
+            if (nc.health_kit || nc.poison_kit || nc.money>0) return next_step_pos;//si se ha llegado al objetivo, devolver la pos a seguir
 
-          dist[nx][ny] = dist[x][y] + 1;//aumentar la distancia
-          q.push({Pos(nx,ny), next_step_pos});//añadir la nueva posicion visitada a la cola con el paso incial a seguir
+            dist[nx][ny] = dist[x][y] + 1;//aumentar la distancia
+            q.push({Pos(nx,ny), next_step_pos});//añadir la nueva posicion visitada a la cola con el paso incial a seguir
+          }
         }
       }
     }
@@ -171,15 +178,17 @@ struct PLAYER_NAME : public Player {
         int nx = x + dir_x[i];
         int ny = y + dir_y[i];
 
-        Cell nc = cell(nx,ny);
-        if (pos_ok(Pos(nx, ny)) && nc.type != Wall && dist[nx][ny] == -1) {
-          if (p == step_pos) next_step_pos = Pos(nx, ny);
-          else next_step_pos = step_pos;
+        if (pos_ok(nx, ny)) {
+          Cell nc = cell(nx,ny);
+          if (nc.type != Wall && dist[nx][ny] == -1) {
+            if (p == step_pos) next_step_pos = Pos(nx, ny);
+            else next_step_pos = step_pos;
 
-          if (nc.box != -1) return next_step_pos;
+            if (nc.box != -1) return next_step_pos;
 
-          dist[nx][ny] = dist[x][y] + 1;
-          q.push({Pos(nx,ny), next_step_pos});
+            dist[nx][ny] = dist[x][y] + 1;
+            q.push({Pos(nx,ny), next_step_pos});
+          }
         }
       }
     }
@@ -256,32 +265,37 @@ struct PLAYER_NAME : public Player {
     vector<int> s = soldiers(me());
     for (int i = 0; i < int(s.size()); i++) {
       Unit u = unit(s[i]);
-      if (available_poison(me()) > 0 && u.poison < 2) charge(s[i]); //recarga veneno si tiene menos de 2
-      
-      //hacer que huya si tiene un enemigo cerca y no tiene veneno*******************************************************************
-      if (u.poison > 0) {//que vayan a matar solo si tienen veneno
-        Pos pos_to_kill = BFS_kill_soldiers_or_professors(u.pos, n, m);//mejorarlo y que se prioricen profresores(?)
-        if (pos_to_kill != Pos(-1, -1)) move(u.id, go_to(u.pos, pos_to_kill));
-        else move(u.id, Down);
-      } else {//los demas van a recoger kits y oro
-        Pos pos_to_loot = BFS_take_kits_or_money(u.pos, n, m);
-        //Pos pos_to_loot = BFS_take_poison_money(u.pos, n, m);
-        if (pos_to_loot != Pos(-1,-1)) move(u.id, go_to(u.pos, pos_to_loot));
-        else move(u.id, Down);
+      if (available_poison(me()) > 0 && u.poison < 2) {
+        charge(s[i]); //recarga veneno si tiene menos de 2
+      } else {
+        //hacer que huya si tiene un enemigo cerca y no tiene veneno*******************************************************************
+        if (u.poison > 0) {//que vayan a matar solo si tienen veneno
+          Pos pos_to_kill = BFS_kill_soldiers_or_professors(u.pos, n, m);//mejorarlo y que se prioricen profresores(?)
+          if (pos_to_kill != Pos(-1, -1)) move(u.id, go_to(u.pos, pos_to_kill));
+          else move(u.id, Down);
+        } else {//los demas van a recoger kits y oro
+          Pos pos_to_loot = BFS_take_kits_or_money(u.pos, n, m);
+          //Pos pos_to_loot = BFS_take_poison_money(u.pos, n, m);
+          if (pos_to_loot != Pos(-1,-1)) move(u.id, go_to(u.pos, pos_to_loot));
+          else move(u.id, Down);
+        }
       }
     }
 
     Unit p = unit(professor(me())); //mi profresor
-    if (available_health(me()) > 0 && p.health < professor_max_health()) heal(p.id); //se cura si tiene menos del tope de vida
-    //ir en direccion a una caja fuerte
-    Pos box_pos = directon_to_box_door(p.pos);
-    if (box_pos != p.pos) {//si esta en la puerta, abrirla
-      vector<int> sol = BF_box_password(cell(box_pos).box);//conseguir solución
-      open(p.id, sol, go_to(p.pos, box_pos));//abrir caja
-    } else {//si no esta en la puerta, ir hacia una
-      Pos pos_to_box = BFS_safety_box(p.pos, n, m);
-      if (pos_to_box != Pos(-1, -1)) move(p.id, go_to(p.pos, pos_to_box));
-      else move(p.id, Down);
+    if (available_health(me()) > 0 && p.health < professor_max_health()) {
+      heal(p.id); //se cura si tiene menos del tope de vida
+    } else {
+      //ir en direccion a una caja fuerte
+      Pos box_pos = directon_to_box_door(p.pos);
+      if (box_pos != p.pos) {//si esta en la puerta, abrirla
+        vector<int> sol = BF_box_password(cell(box_pos).box);//conseguir solución
+        open(p.id, sol, go_to(p.pos, box_pos));//abrir caja
+      } else {//si no esta en la puerta, ir hacia una
+        Pos pos_to_box = BFS_safety_box(p.pos, n, m);
+        if (pos_to_box != Pos(-1, -1)) move(p.id, go_to(p.pos, pos_to_box));
+        else move(p.id, Down);
+      }
     }
   }
 };
