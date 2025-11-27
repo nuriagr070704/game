@@ -163,6 +163,50 @@ struct PLAYER_NAME : public Player {
   Pos BFS_safety_box(Pos& p, int n, int m) {
     vector<vector<int>> dist(n, vector<int>(m, -1));
     queue<pair<Pos, Pos>> q;
+    map<int, int> blocked;//{id_player, box_id}
+    Pos next_step_pos;
+
+    for (int i = 0; i < num_players(); i++) {
+      Unit u = unit(professor(i));
+      q.push({u.pos, u.pos});
+      dist[u.pos.i][u.pos.j] = i;
+    }
+
+    while (!q.empty()) {
+      int x = q.front().first.i;
+      int y = q.front().first.j;
+      Pos step_pos = q.front().second;
+      q.pop();
+
+      for (int i = 0; i<4; i++) {
+        int nx = x + dir_x[i];
+        int ny = y + dir_y[i];
+
+        if (pos_ok(nx, ny)) {
+          Cell nc = cell(nx,ny);
+          if (nc.type != Wall && nc.id == -1 && dist[nx][ny] == -1) {
+            if (unit(professor(dist[x][y])).pos == step_pos) next_step_pos = Pos(nx, ny);
+            else next_step_pos = step_pos;
+
+            auto it = blocked.find(dist[x][y]);//el jugador ha bloqueado alguna caja ya?
+            if (nc.box != -1 && it == blocked.end()) {
+              if (dist[x][y] != me() && it->second) blocked.insert({dist[x][y], nc.box});//no ha bloqueado y no soy yo, bloquea
+              else return next_step_pos;//soy yo, voy a por esa caja
+            }
+
+            dist[nx][ny] = dist[x][y];
+            q.push({Pos(nx,ny), next_step_pos});
+          }
+        }
+      }
+    }
+    return p;
+  }
+
+  //posicion a seguir para llegar a una caja
+  Pos BFS_safety_box_prev(Pos& p, int n, int m) {
+    vector<vector<int>> dist(n, vector<int>(m, -1));
+    queue<pair<Pos, Pos>> q;
     Pos next_step_pos;
 
     q.push({p, p});
@@ -180,7 +224,7 @@ struct PLAYER_NAME : public Player {
 
         if (pos_ok(nx, ny)) {
           Cell nc = cell(nx,ny);
-          if (nc.type != Wall && dist[nx][ny] == -1) {
+          if (nc.type != Wall && nc.id == -1 && dist[nx][ny] == -1) {
             if (p == step_pos) next_step_pos = Pos(nx, ny);
             else next_step_pos = step_pos;
 
@@ -265,12 +309,12 @@ struct PLAYER_NAME : public Player {
     vector<int> s = soldiers(me());
     for (int i = 0; i < int(s.size()); i++) {
       Unit u = unit(s[i]);
-      if (available_poison(me()) > 0 && u.poison < 2) {
+      if (available_poison(me()) > 0 && u.poison < 2) {//
         charge(s[i]); //recarga veneno si tiene menos de 2
       } else {
-        //hacer que huya si tiene un enemigo cerca y no tiene veneno*******************************************************************
+        //solo matar a los adyacentes
         //puede ir a una caja fuerte el muñeco jajajjajajjajja
-        if (u.poison > 0) {//que vayan a matar solo si tienen veneno
+        if (false) {//que vayan a matar solo si tienen veneno
           Pos pos_to_kill = BFS_kill_soldiers_or_professors(u.pos, n, m);//mejorarlo y que se prioricen profresores(?)
           if (pos_to_kill != Pos(-1, -1)) move(u.id, go_to(u.pos, pos_to_kill));
           else {
@@ -297,8 +341,8 @@ struct PLAYER_NAME : public Player {
         vector<int> sol = BF_box_password(cell(box_pos).box);//conseguir solución
         open(p.id, sol, go_to(p.pos, box_pos));//abrir caja
       } else {//si no esta en la puerta, ir hacia una
-        Pos pos_to_box = BFS_safety_box(p.pos, n, m);
-        if (pos_to_box != Pos(-1, -1)) move(p.id, go_to(p.pos, pos_to_box));
+        Pos pos_to_box = BFS_safety_box_prev(p.pos, n, m);
+        if (pos_to_box != Pos(-1, -1)) move(p.id, go_to(p.pos, pos_to_box));//que no vaya a una caja que otro profesor tiene mas cerca
         else move(p.id, Down);
       }
     }
